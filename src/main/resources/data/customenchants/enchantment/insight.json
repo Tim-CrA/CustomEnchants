@@ -1,0 +1,19 @@
+{
+  "description": "Insight",
+  "supported_items": "#minecraft:swords",
+  "weight": 1,
+  "max_level": 2,
+  "min_cost": {
+    "base": 10,
+    "per_level_above_first": 10
+  },
+  "max_cost": {
+    "base": 40,
+    "per_level_above_first": 20
+  },
+  "anvil_cost": 1,
+  "slots": [
+    "mainhand"
+  ],
+  "effects": {}
+}

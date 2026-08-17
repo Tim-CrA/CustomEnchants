@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradlew
+!gradlew.bat
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+bin/
+
+# Build outputs
+out/
+builds/
+*.class
+
+# Example (compact dev world)
+example/
+
+# Other
+*.log

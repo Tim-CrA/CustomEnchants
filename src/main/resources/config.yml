@@ -1,0 +1,154 @@
+drill:
+  enabled: true
+  max-level: 3
+  # Sneak (Shift) to break a single block instead of 3x3
+  sneak-bypass: true
+  blacklist:
+    - BEDROCK
+    - OBSIDIAN
+    - END_PORTAL_FRAME
+    - SPAWNER
+    - CHEST
+    - BARREL
+    - SHULKER_BOX
+    - FURNACE
+    - HOPPER
+    - DISPENSER
+    - DROPPER
+    - ENDER_CHEST
+    - ENCHANTING_TABLE
+    - ANVIL
+    - CHIPPED_ANVIL
+    - DAMAGED_ANVIL
+
+magnet:
+  enabled: true
+  particles: true
+
+smelter:
+  enabled: true
+  blacklist:
+    - ANCIENT_DEBRIS
+  # Custom smelting recipes. Format: SOURCE: RESULT
+  # Example: "SAND: GLASS", "COBBLESTONE: STONE"
+  custom-recipes:
+    # Leave empty or add your own entries
+    # For example: COBBLESTONE: STONE
+
+farmer:
+  enabled: true
+
+harpoon:
+  enabled: true
+  max-distance: 80
+  cooldown-seconds:
+    1: 180
+    2: 120
+    3: 60
+
+veinminer:
+  enabled: true
+  # Sneak (Shift) to break a single block instead of the whole vein
+  sneak-bypass: true
+  max-vein-size: 64
+  allowed-materials:
+    # Ores
+    - IRON_ORE
+    - DEEPSLATE_IRON_ORE
+    - COPPER_ORE
+    - DEEPSLATE_COPPER_ORE
+    - GOLD_ORE
+    - DEEPSLATE_GOLD_ORE
+    - REDSTONE_ORE
+    - DEEPSLATE_REDSTONE_ORE
+    - LAPIS_ORE
+    - DEEPSLATE_LAPIS_ORE
+    - DIAMOND_ORE
+    - DEEPSLATE_DIAMOND_ORE
+    - EMERALD_ORE
+    - DEEPSLATE_EMERALD_ORE
+    - COAL_ORE
+    - DEEPSLATE_COAL_ORE
+    - NETHER_GOLD_ORE
+    - NETHER_QUARTZ_ORE
+    - ANCIENT_DEBRIS
+    # Other
+    - COAL_BLOCK
+    - DEEPSLATE
+    - CALCITE
+
+lumberjack:
+  enabled: true
+  # Sneak (Shift) to chop a single block instead of the whole tree
+  sneak-bypass: true
+  # Break leaves along with the logs
+  break-leaves: true
+  # How far from the trunk leaves should be removed
+  leaves-radius: 5
+  # Max log blocks per chop
+  max-tree-size: 256
+
+excavator:
+  enabled: true
+  # Sneak (Shift) to break a single block instead of 3x3
+  sneak-bypass: true
+  blacklist:
+    - BEDROCK
+    - SPAWNER
+    - CHEST
+    - BARREL
+    - SHULKER_BOX
+    - ENDER_CHEST
+
+insight:
+  enabled: true
+  # Mob XP multiplier per enchantment level
+  xp-multiplier:
+    1: 1.5
+    2: 2.0
+
+loot:
+  enabled: true
+  entries:
+    - table: minecraft:chests/abandoned_mineshaft
+      chance: 0.1
+      max-level: 1
+      enchantments:
+        - drill
+        - magnet
+        - smelter
+    - table: minecraft:chests/simple_dungeon
+      chance: 0.08
+      max-level: 1
+      enchantments:
+        - smelter
+    - table: minecraft:chests/village_plains_house
+      chance: 0.05
+      max-level: 1
+      enchantments:
+        - farmer
+    - table: minecraft:chests/village_taiga_house
+      chance: 0.05
+      max-level: 1
+      enchantments:
+        - farmer
+    - table: minecraft:chests/underwater_ruin_small
+      chance: 0.05
+      max-level: 1
+      enchantments:
+        - harpoon
+    - table: minecraft:chests/underwater_ruin_big
+      chance: 0.06
+      max-level: 2
+      enchantments:
+        - harpoon
+    - table: minecraft:chests/buried_treasure
+      chance: 0.1
+      max-level: 3
+      enchantments:
+        - harpoon
+    - table: minecraft:chests/abandoned_mineshaft
+      chance: 0.05
+      max-level: 1
+      enchantments:
+        - veinminer
