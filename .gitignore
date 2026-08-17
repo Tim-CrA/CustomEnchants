@@ -21,5 +21,8 @@ builds/
 # Example (compact dev world)
 example/
 
+# Modrinth copy-paste materials (local only, not part of the source)
+modrinth/
+
 # Other
 *.log
