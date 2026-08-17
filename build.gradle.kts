@@ -28,14 +28,3 @@ tasks.processResources {
         expand("version" to project.version)
     }
 }
-
-// Copy the built plugin to the test server
-tasks.register<Copy>("installPlugin") {
-    dependsOn(tasks.jar)
-    from(layout.buildDirectory.file("libs/${project.name}-${project.version}.jar"))
-    into("D:\\mcdevtest\\mc-srv\\mc2\\data\\plugins")
-    rename { "${project.name}-${project.version}.jar" }
-    doFirst {
-        println("Copying plugin JAR: `${project.name}-${project.version}.jar` -> `D:\\mcdevtest\\mc-srv\\mc2\\data\\plugins`...")
-    }
-}

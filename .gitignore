@@ -24,5 +24,8 @@ example/
 # Modrinth copy-paste materials (local only, not part of the source)
 modrinth/
 
+# Local notes with environment-specific info (paths, passwords)
+PROJECT_INFO.md
+
 # Other
 *.log
