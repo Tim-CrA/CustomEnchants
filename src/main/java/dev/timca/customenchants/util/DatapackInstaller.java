@@ -34,10 +34,13 @@ public final class DatapackInstaller {
         File jarFile = pluginFile(plugin);
         if (jarFile == null) return false;
 
-        File worldFolder = Bukkit.getWorlds().isEmpty()
-                ? new File(".")
-                : Bukkit.getWorlds().get(0).getWorldFolder();
-        File target = new File(worldFolder, "datapacks" + File.separator + "customenchants");
+        // Registry datapacks live in <world-root>/datapacks — NOT in the per-dimension
+        // folder that World#getWorldFolder() returns on newer versions (26.x).
+        String worldName = Bukkit.getWorlds().isEmpty()
+                ? "world"
+                : Bukkit.getWorlds().get(0).getName();
+        File worldRoot = new File(Bukkit.getWorldContainer(), worldName);
+        File target = new File(worldRoot, "datapacks" + File.separator + "customenchants");
         boolean changed = false;
 
         try (JarFile jar = new JarFile(jarFile)) {
@@ -63,9 +66,12 @@ public final class DatapackInstaller {
         File mcmeta = new File(target, "pack.mcmeta");
         if (!mcmeta.isFile()) {
             int format = detectPackFormat();
+            // supported_formats keeps the pack valid across many game versions
+            String content = "{\"pack\":{\"pack_format\":" + format
+                    + ",\"supported_formats\":{\"min_inclusive\":26,\"max_inclusive\":9999}"
+                    + ",\"description\":\"CustomEnchants enchantments\"}}";
             try (Writer w = new OutputStreamWriter(new FileOutputStream(mcmeta), StandardCharsets.UTF_8)) {
-                w.write("{\"pack\":{\"pack_format\":" + format
-                        + ",\"description\":\"CustomEnchants enchantments\"}}");
+                w.write(content);
             } catch (IOException e) {
                 plugin.getLogger().severe("Could not write pack.mcmeta: " + e.getMessage());
                 return false;
@@ -82,12 +88,17 @@ public final class DatapackInstaller {
     private static int detectPackFormat() {
         try {
             Object unsafe = Bukkit.getUnsafe();
-            Method m = unsafe.getClass().getMethod("getDataPackPackFormat");
-            Object value = m.invoke(unsafe);
-            if (value instanceof Integer i && i > 0) return i;
+            for (Method m : unsafe.getClass().getMethods()) {
+                if (m.getParameterCount() == 0
+                        && (m.getReturnType() == int.class || m.getReturnType() == Integer.class)
+                        && m.getName().toLowerCase().contains("datapack")) {
+                    Object value = m.invoke(unsafe);
+                    if (value instanceof Integer i && i > 0) return i;
+                }
+            }
         } catch (Throwable ignored) {
         }
-        return 48; // 1.21 baseline
+        return 48; // 1.21 baseline; supported_formats widens the accepted range
     }
 
     private static File pluginFile(Plugin plugin) {

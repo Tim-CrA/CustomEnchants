@@ -46,9 +46,27 @@ public class HarpoonListener implements Listener {
     private static final double PULL_SPEED = 0.5;
     private static final long MAX_PULL_TICKS = 80;
     private static final long ORIGIN_TTL_MS = 300_000;
+    // Keep fall protection for 5s after the pull ends so the landing impact is covered
+    private static final long FALL_GRACE_TICKS = 100;
 
     public HarpoonListener() {
         reload();
+        // Safety net: stamp EVERY harpoon trident in every inventory each second, so
+        // the cooldown fog is uniform no matter how the trident was obtained
+        // (enchanting table, anvil, loot, pickup, another plugin's command...).
+        CustomEnchantsPlugin.getInstance().getServer().getScheduler()
+                .runTaskTimer(CustomEnchantsPlugin.getInstance(), this::stampAllHeldTridents, 40L, 20L);
+    }
+
+    private void stampAllHeldTridents() {
+        if (!enabled || !FOG) return;
+        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            for (ItemStack it : p.getInventory().getContents()) {
+                if (it == null || it.getType() != Material.TRIDENT) continue;
+                if (CustomEnchant.getLevel(it, CustomEnchant.HARPOON) < 1) continue;
+                HarpoonFog.ensure(it);
+            }
+        }
     }
 
     public void reload() {
@@ -109,6 +127,10 @@ public class HarpoonListener implements Listener {
         if (item == null) return;
         int level = CustomEnchant.getLevel(item, CustomEnchant.HARPOON);
         if (level < 1) return;
+        // Keep the cooldown group on the flying entity's item so the trident
+        // still has it when picked back up
+        ensureHarpoonCooldownGroup(item);
+        trident.setItem(item);
 
         UUID pid = player.getUniqueId();
         long now = System.currentTimeMillis();
@@ -116,6 +138,13 @@ public class HarpoonListener implements Listener {
         int cd = cooldownSeconds.getOrDefault(level, 10);
         if (now - cooldowns.getOrDefault(pid, 0L) < cd * 1000L) {
             event.setCancelled(true);
+            // Show the remaining cooldown on the trident right away — otherwise the
+            // fog only appears after a landed hit and a blocked throw feels silent.
+            if (FOG) {
+                long remaining = (cooldowns.get(pid) + cd * 1000L - now) / 50L;
+                HarpoonFog.apply(player, (int) Math.max(1, remaining));
+            }
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1f, 0.5f);
             return;
         }
         tridentOrigins.put(trident.getUniqueId(), new Origin(player.getLocation(), now));
@@ -169,11 +198,26 @@ public class HarpoonListener implements Listener {
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onPlayerDamage(org.bukkit.event.entity.EntityDamageEvent event) {
-        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL
-                && event.getEntity() instanceof Player player
+        if (event.getEntity() instanceof Player player
                 && pullingPlayers.contains(player.getUniqueId())) {
-            event.setCancelled(true);
+            org.bukkit.event.entity.EntityDamageEvent.DamageCause cause = event.getCause();
+            // Pulled players smash into ground (FALL) or walls (FLY_INTO_WALL)
+            if (cause == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL
+                    || cause == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FLY_INTO_WALL) {
+                event.setCancelled(true);
+            }
         }
+    }
+
+    /**
+     * Ends fall protection after a grace period: the landing impact registers a few
+     * ticks AFTER the pull task finishes, so removing the flag immediately let the
+     * fall damage through.
+     */
+    private void releaseFallProtection(UUID uuid) {
+        CustomEnchantsPlugin.getInstance().getServer().getScheduler()
+                .runTaskLater(CustomEnchantsPlugin.getInstance(),
+                        () -> pullingPlayers.remove(uuid), FALL_GRACE_TICKS);
     }
 
     private void pullEntityToPlayer(Player player, Entity entity) {
@@ -189,14 +233,14 @@ public class HarpoonListener implements Listener {
         long[] ticks = {0};
         holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler().runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
             if (!entity.isValid() || entity.getLocation().distance(origin) < 1.5 || ++ticks[0] > MAX_PULL_TICKS) {
-                if (pulledPlayerId[0] != null) pullingPlayers.remove(pulledPlayerId[0]);
+                if (pulledPlayerId[0] != null) releaseFallProtection(pulledPlayerId[0]);
                 if (holder[0] != null) holder[0].cancel();
                 return;
             }
             Vector dir = origin.toVector().subtract(entity.getLocation().toVector());
             double dist = dir.length();
             if (dist < 1.5) {
-                if (pulledPlayerId[0] != null) pullingPlayers.remove(pulledPlayerId[0]);
+                if (pulledPlayerId[0] != null) releaseFallProtection(pulledPlayerId[0]);
                 if (holder[0] != null) holder[0].cancel();
                 return;
             }
@@ -213,14 +257,14 @@ public class HarpoonListener implements Listener {
         long[] ticks = {0};
         holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler().runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
             if (!player.isOnline() || player.getLocation().distance(target) < 1.5 || ++ticks[0] > MAX_PULL_TICKS) {
-                pullingPlayers.remove(puid);
+                releaseFallProtection(puid);
                 if (holder[0] != null) holder[0].cancel();
                 return;
             }
             Vector dir = target.toVector().subtract(player.getLocation().toVector());
             double dist = dir.length();
             if (dist < 1.5) {
-                pullingPlayers.remove(puid);
+                releaseFallProtection(puid);
                 if (holder[0] != null) holder[0].cancel();
                 return;
             }
