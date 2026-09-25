@@ -32,3 +32,9 @@ PROJECT_INFO.md
 
 # Other
 *.log
+
+# Local tool artifacts
+.zcodeignore
+
+# Local build config
+gradle.properties

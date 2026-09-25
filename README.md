@@ -1,8 +1,14 @@
 # Custom Enchants
 
-Custom Enchants is a Paper plugin that adds new enchantments beyond what vanilla Minecraft offers. Each enchantment is natively integrated — it works just like a built-in one, available through enchanting tables, anvils, and enchanted books.
+Custom Enchants is a Minecraft plugin that adds new enchantments beyond what vanilla Minecraft offers. Each enchantment is natively integrated — it works just like a built-in one, available through enchanting tables, anvils, and enchanted books.
 
 The plugin is actively developed. New enchantments are added with each update.
+
+## Compatibility
+
+- Works on **Paper, Purpur, Spigot and forks** from **1.20.5** up to the latest release (26.2)
+- On Paper the enchantments register natively; on Spigot and forks they install as a world datapack on first launch — restart the server once and they are live
+- Requires Java 21+ (Minecraft 1.20.5+ already needs it)
 
 ## Features
 
@@ -40,9 +46,10 @@ The plugin is actively developed. New enchantments are added with each update.
 
 1. Drop the `.jar` into your `plugins/` folder
 2. Restart the server
-3. All enchantments are available immediately
+3. On Spigot and forks, restart once more after the first launch (the enchantments install as a world datapack)
+4. All enchantments are available immediately
 
 ## Requirements
 
-- Paper 1.21+ (or any Paper fork)
+- Paper, Purpur, Spigot or any fork — **1.20.5+**
 - Java 21+

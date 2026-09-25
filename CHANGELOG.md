@@ -3,6 +3,40 @@
 Each entry below is the exact text published on the corresponding version page
 on Modrinth: https://modrinth.com/plugin/custom_enchants
 
+## What's new in 2.0.0 — the global update
+
+### One jar for every modern server
+- Works on **Paper, Purpur, Spigot and forks** from **1.20.5 up to 26.2** (the latest release)
+- On Paper the enchantments register natively; on Spigot and forks they install as a world datapack on first launch — restart the server once and they are live
+- Same features on every core: no more Paper-only builds
+
+### New enchantments
+- **Lumberjack** — chops down a whole tree with one axe hit (leaves are broken along the way and drop saplings/apples via loot tables)
+- **Excavator** — digs 3×3 areas with a shovel (level III digs 3 layers deep)
+- **Insight** — mobs killed with an Insight sword drop more experience (multiplier per level, configurable)
+
+### Fixes
+- Structure loot chests now actually contain enchanted books — the loot config section was never read, so the feature was silently dead
+- Harpoon tridents enchanted by players (enchanting table, anvil, books) now get the vanilla cooldown overlay too, not only tridents given via commands
+- Every Harpoon trident now receives the cooldown automatically, so the fog works no matter where the trident came from
+- Pulled players no longer take fall or wall-smash damage — protection now covers the landing as well
+- Blocked Harpoon throws now show the remaining cooldown on the trident immediately (plus a soft sound) instead of failing silently
+- Area enchantments (Drill, Excavator, VeinMiner, Lumberjack) now respect region protection: plugins like WorldGuard can veto the extra blocks, and logging plugins see them
+- No more free fall-damage immunity after Harpooning a mob — only the pulled player is protected
+- Unbreaking now works on extra blocks broken by area enchantments
+- Harpoon no longer leaks memory when a trident misses or a player logs out
+
+### Improvements
+- Drill and Excavator now only break blocks mineable with their tool (a shovel can no longer break stone)
+- Drill and VeinMiner now drop proper experience for mined ores
+- Magnet now works on all mining tools (axe, shovel, hoe, shears) and no longer pulls items into armor slots
+- Farmer now supports sweet berries (right-click harvest, like vanilla) and cocoa; replanting keeps cocoa facing
+- Farmer drops can be collected by Magnet on the same tool
+- Drill, Excavator and VeinMiner now share one mining pipeline (consistent drops, XP, smelting and durability)
+- Sneaking (Shift) temporarily disables any area enchantment (Drill, Excavator, VeinMiner, Lumberjack)
+- Enchantments can appear in structure loot chests (configurable)
+- Everything is configurable via `config.yml`, `/cenchant reload` applies changes immediately
+
 ## What's new in 1.2.1
 
 ### Fixes
