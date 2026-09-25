@@ -45,7 +45,7 @@ public class LumberjackListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (!enabled) return;
+        if (!enabled || MiningUtils.isSyntheticBreak()) return;
         Player player = event.getPlayer();
         if (player.getGameMode() != GameMode.SURVIVAL) return;
         if (sneakBypass && player.isSneaking()) return;
@@ -65,20 +65,22 @@ public class LumberjackListener implements Listener {
         for (Block b : logs) {
             if (b.equals(origin)) continue;
             if (!isLog(b.getType())) continue;
+            if (!MiningUtils.canBreakExtra(b, player)) continue;
             Collection<ItemStack> drops = b.getDrops(item);
             b.setType(Material.AIR);
             broken++;
             dropOrCollect(player, b, drops, hasMagnet);
         }
         for (Block b : leaves) {
-            if (b.getType() == Material.AIR) continue;
+            if (b.getType().isAir()) continue;
+            if (!MiningUtils.canBreakExtra(b, player)) continue;
             // Leaves don't drop themselves without shears, but their loot table
             // yields saplings and apples
             Collection<ItemStack> leafDrops = b.getDrops(item);
             b.setType(Material.AIR);
             dropOrCollect(player, b, leafDrops, hasMagnet);
         }
-        if (broken > 0) item.damage(broken, player);
+        if (broken > 0) MiningUtils.damageTool(item, broken, player);
     }
 
     private boolean isLog(Material type) {

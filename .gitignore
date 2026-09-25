@@ -24,6 +24,9 @@ example/
 # Modrinth copy-paste materials (local only, not part of the source)
 modrinth/
 
+# Security scanner workspace
+.mimosa/
+
 # Local notes with environment-specific info (paths, passwords)
 PROJECT_INFO.md
 

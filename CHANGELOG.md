@@ -3,6 +3,21 @@
 Each entry below is the exact text published on the corresponding version page
 on Modrinth: https://modrinth.com/plugin/custom_enchants
 
+## What's new in 1.2.1
+
+### Fixes
+- Structure loot chests now actually contain enchanted books — the loot config section was never read, so the feature was silently dead
+- Harpoon tridents enchanted by players (enchanting table, anvil, books) now get the vanilla cooldown overlay too, not only tridents given via commands
+- Area enchantments (Drill, Excavator, VeinMiner, Lumberjack) now respect region protection: plugins like WorldGuard can veto the extra blocks, and logging plugins see them
+- No more free fall-damage immunity after Harpooning a mob — only the pulled player is protected
+- Unbreaking now works on extra blocks broken by area enchantments
+- Harpoon no longer leaks memory when a trident misses or a player logs out
+
+### Improvements
+- Farmer now supports sweet berries and cocoa; replanting keeps cocoa facing
+- Farmer drops can be collected by Magnet on the same tool
+- Drill, Excavator and VeinMiner now share one mining pipeline (consistent drops, XP, smelting and durability)
+
 ## What's new in 1.2.0
 
 ### New enchantments

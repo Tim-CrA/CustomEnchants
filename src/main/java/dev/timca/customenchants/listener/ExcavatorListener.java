@@ -8,7 +8,6 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -16,7 +15,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -45,7 +43,7 @@ public class ExcavatorListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (!enabled) return;
+        if (!enabled || MiningUtils.isSyntheticBreak()) return;
         Player player = event.getPlayer();
         if (player.getGameMode() != GameMode.SURVIVAL) return;
         if (sneakBypass && player.isSneaking()) return;
@@ -59,31 +57,13 @@ public class ExcavatorListener implements Listener {
         if (blacklist.contains(origin.getType())) return;
         // Shovels may only break blocks from minecraft:mineable/shovel
         if (!MiningUtils.isMineableWith(origin.getType(), "mineable/shovel")) return;
-        boolean hasSmelter = CustomEnchant.hasEnchant(item, CustomEnchant.SMELTER);
-        boolean hasMagnet = CustomEnchant.hasEnchant(item, CustomEnchant.MAGNET);
 
         BlockFace face = MiningUtils.getFacing(player);
         List<Block> toBreak = MiningUtils.getAreaBlocks(origin, face, level);
-        int broken = 0;
-        for (Block b : toBreak) {
-            if (b.equals(origin)) continue;
-            if (blacklist.contains(b.getType())) continue;
-            if (b.getType() == Material.AIR) continue;
-            if (!MiningUtils.isMineableWith(b.getType(), "mineable/shovel")) continue;
-
-            ItemStack dropsTool = item.clone();
-            if (hasSmelter) dropsTool.removeEnchantment(Enchantment.SILK_TOUCH);
-            Collection<ItemStack> drops = b.getDrops(dropsTool);
-            if (hasSmelter) drops = MiningUtils.smelt(drops);
-            MiningUtils.dropExperience(b, player, hasSmelter);
-            b.setType(Material.AIR);
-            broken++;
-            if (hasMagnet) {
-                for (ItemStack d : drops) MiningUtils.addToInventory(player, d);
-            } else {
-                for (ItemStack d : drops) player.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), d);
-            }
-        }
-        if (broken > 0) item.damage(broken, player);
+        toBreak.remove(origin);
+        MiningUtils.breakExtraBlocks(player, item, toBreak, blacklist,
+                t -> MiningUtils.isMineableWith(t, "mineable/shovel"),
+                CustomEnchant.hasEnchant(item, CustomEnchant.SMELTER),
+                CustomEnchant.hasEnchant(item, CustomEnchant.MAGNET));
     }
 }

@@ -6,6 +6,7 @@ import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.UseCooldown;
 import net.kyori.adventure.key.Key;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -16,8 +17,11 @@ import org.bukkit.entity.Trident;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -35,14 +39,17 @@ public class HarpoonListener implements Listener {
     // so regular tridents stay unblocked and throwable.
     public static final Key COOLDOWN_GROUP = Key.key("customenchants", "harpoon");
 
+    private record Origin(Location loc, long created) {}
+
     private boolean enabled;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
-    private final Map<UUID, Location> tridentOrigins = new HashMap<>();
+    private final Map<UUID, Origin> tridentOrigins = new HashMap<>();
     private final Set<UUID> pullingPlayers = new HashSet<>();
     private Map<Integer, Integer> cooldownSeconds;
     private double maxDistance = 80;
     private static final double PULL_SPEED = 0.5;
     private static final long MAX_PULL_TICKS = 80;
+    private static final long ORIGIN_TTL_MS = 300_000;
 
     public HarpoonListener() {
         reload();
@@ -81,6 +88,29 @@ public class HarpoonListener implements Listener {
                 UseCooldown.useCooldown(0.0001f).cooldownGroup(COOLDOWN_GROUP));
     }
 
+    /**
+     * The component must be on the inventory item BEFORE the throw (at launch the
+     * item is already consumed), so we stamp it on every right click with a
+     * Harpoon trident in hand — this also covers self-enchanted tridents.
+     */
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onInteract(PlayerInteractEvent event) {
+        if (!enabled) return;
+        Action action = event.getAction();
+        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
+        ItemStack hand = event.getPlayer().getInventory().getItemInMainHand();
+        if (hand.getType() != Material.TRIDENT) return;
+        if (CustomEnchant.getLevel(hand, CustomEnchant.HARPOON) < 1) return;
+        ensureHarpoonCooldownGroup(hand);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        cooldowns.remove(uuid);
+        pullingPlayers.remove(uuid);
+    }
+
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onProjectileLaunch(ProjectileLaunchEvent event) {
         if (!enabled) return;
@@ -90,16 +120,16 @@ public class HarpoonListener implements Listener {
         if (item == null) return;
         int level = CustomEnchant.getLevel(item, CustomEnchant.HARPOON);
         if (level < 1) return;
-        ensureHarpoonCooldownGroup(item);
 
         UUID pid = player.getUniqueId();
         long now = System.currentTimeMillis();
+        tridentOrigins.values().removeIf(o -> now - o.created() > ORIGIN_TTL_MS);
         int cd = cooldownSeconds.getOrDefault(level, 10);
         if (now - cooldowns.getOrDefault(pid, 0L) < cd * 1000L) {
             event.setCancelled(true);
             return;
         }
-        tridentOrigins.put(trident.getUniqueId(), player.getLocation());
+        tridentOrigins.put(trident.getUniqueId(), new Origin(player.getLocation(), now));
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
@@ -111,16 +141,16 @@ public class HarpoonListener implements Listener {
         if (item == null) return;
         int level = CustomEnchant.getLevel(item, CustomEnchant.HARPOON);
         if (level < 1) return;
-        ensureHarpoonCooldownGroup(item);
 
         UUID pid = player.getUniqueId();
         long now = System.currentTimeMillis();
+        // Consume the origin entry even when the hit lands during cooldown
+        Origin origin = tridentOrigins.remove(trident.getUniqueId());
         int cd = cooldownSeconds.getOrDefault(level, 10);
         if (now - cooldowns.getOrDefault(pid, 0L) < cd * 1000L) {
             return;
         }
 
-        Location origin = tridentOrigins.remove(trident.getUniqueId());
         Entity hitEntity = event.getHitEntity();
         Block hitBlock = event.getHitBlock();
         Location hitLoc = null;
@@ -128,7 +158,7 @@ public class HarpoonListener implements Listener {
         else if (hitBlock != null) hitLoc = hitBlock.getLocation();
         else return;
 
-        if (origin != null && origin.distance(hitLoc) > maxDistance) {
+        if (origin != null && origin.loc().distance(hitLoc) > maxDistance) {
             player.getInventory().addItem(item);
             trident.remove();
             player.sendMessage("\u00a7cToo far! Max " + (int) maxDistance + " blocks");
@@ -158,21 +188,26 @@ public class HarpoonListener implements Listener {
     }
 
     private void pullEntityToPlayer(Player player, Entity entity) {
-        UUID puid = player.getUniqueId();
-        pullingPlayers.add(puid);
+        // Only the PULLED player gets fall-damage protection — adding the shooter
+        // here would grant them a few seconds of fall-damage immunity per throw.
+        final UUID[] pulledPlayerId = {null};
+        if (entity instanceof Player pulled) {
+            pulledPlayerId[0] = pulled.getUniqueId();
+            pullingPlayers.add(pulledPlayerId[0]);
+        }
         Location origin = player.getLocation();
         BukkitTask[] holder = new BukkitTask[1];
         long[] ticks = {0};
         holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler().runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
             if (!entity.isValid() || entity.getLocation().distance(origin) < 1.5 || ++ticks[0] > MAX_PULL_TICKS) {
-                pullingPlayers.remove(puid);
+                if (pulledPlayerId[0] != null) pullingPlayers.remove(pulledPlayerId[0]);
                 if (holder[0] != null) holder[0].cancel();
                 return;
             }
             Vector dir = origin.toVector().subtract(entity.getLocation().toVector());
             double dist = dir.length();
             if (dist < 1.5) {
-                pullingPlayers.remove(puid);
+                if (pulledPlayerId[0] != null) pullingPlayers.remove(pulledPlayerId[0]);
                 if (holder[0] != null) holder[0].cancel();
                 return;
             }

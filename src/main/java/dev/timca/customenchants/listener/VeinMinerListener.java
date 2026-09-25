@@ -7,7 +7,6 @@ import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -17,7 +16,6 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -50,7 +48,7 @@ public class VeinMinerListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (!enabled) return;
+        if (!enabled || MiningUtils.isSyntheticBreak()) return;
         Player player = event.getPlayer();
         if (player.getGameMode() != GameMode.SURVIVAL) return;
         if (sneakBypass && player.isSneaking()) return;
@@ -63,31 +61,11 @@ public class VeinMinerListener implements Listener {
 
         if (!allowedMaterials.contains(type)) return;
 
-        boolean hasSmelter = CustomEnchant.hasEnchant(item, CustomEnchant.SMELTER);
-        boolean hasMagnet = CustomEnchant.hasEnchant(item, CustomEnchant.MAGNET);
-
         List<Block> vein = findVein(origin, type);
-        int broken = 0;
-        for (Block b : vein) {
-            if (b.equals(origin)) continue;
-            if (b.getType() != type) continue;
-
-            ItemStack dropsTool = item.clone();
-            if (hasSmelter)
-                dropsTool.removeEnchantment(Enchantment.SILK_TOUCH);
-            Collection<ItemStack> drops = b.getDrops(dropsTool);
-            if (hasSmelter) drops = MiningUtils.smelt(drops);
-            MiningUtils.dropExperience(b, player, hasSmelter);
-            b.setType(Material.AIR);
-            broken++;
-            if (hasMagnet) {
-                for (ItemStack d : drops) MiningUtils.addToInventory(player, d);
-            } else {
-                for (ItemStack d : drops)
-                    player.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), d);
-            }
-        }
-        if (broken > 0) item.damage(broken, player);
+        vein.remove(origin);
+        MiningUtils.breakExtraBlocks(player, item, vein, Set.of(), t -> t == type,
+                CustomEnchant.hasEnchant(item, CustomEnchant.SMELTER),
+                CustomEnchant.hasEnchant(item, CustomEnchant.MAGNET));
     }
 
     private List<Block> findVein(Block origin, Material type) {

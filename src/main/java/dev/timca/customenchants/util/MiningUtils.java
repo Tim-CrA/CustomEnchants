@@ -9,6 +9,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.Player;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
@@ -16,7 +17,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Predicate;
 
 /** Shared logic for block-breaking enchantments (Drill, VeinMiner, Magnet). */
 public final class MiningUtils {
@@ -89,6 +92,70 @@ public final class MiningUtils {
         Tag<Material> tag = Bukkit.getTag(Tag.REGISTRY_BLOCKS,
                 NamespacedKey.minecraft(mineableTagName), Material.class);
         return tag != null && tag.isTagged(block);
+    }
+
+    // Marks the thread while a synthetic BlockBreakEvent is being dispatched,
+    // so our own listeners skip it and don't recurse.
+    private static final ThreadLocal<Boolean> SYNTHETIC = ThreadLocal.withInitial(() -> false);
+
+    /** True while a plugin-fired synthetic BlockBreakEvent is being dispatched. */
+    public static boolean isSyntheticBreak() {
+        return SYNTHETIC.get();
+    }
+
+    /**
+     * Fires a nested BlockBreakEvent so protection plugins (WorldGuard etc.) can
+     * veto and logging plugins can see extra blocks broken by area enchantments.
+     */
+    public static boolean canBreakExtra(Block block, Player player) {
+        BlockBreakEvent nested = new BlockBreakEvent(block, player);
+        SYNTHETIC.set(true);
+        try {
+            Bukkit.getPluginManager().callEvent(nested);
+        } finally {
+            SYNTHETIC.set(false);
+        }
+        return !nested.isCancelled();
+    }
+
+    /** Simulates Unbreaking: each damage point is absorbed with level/(level+1) chance. */
+    public static void damageTool(ItemStack tool, int amount, Player player) {
+        int unbreaking = tool.getEnchantmentLevel(Enchantment.UNBREAKING);
+        int toApply = 0;
+        for (int i = 0; i < amount; i++) {
+            if (ThreadLocalRandom.current().nextInt(unbreaking + 1) == 0) toApply++;
+        }
+        if (toApply > 0) tool.damage(toApply, player);
+    }
+
+    /**
+     * Shared pipeline for extra blocks broken by area enchantments (Drill, Excavator,
+     * VeinMiner): filter → region-protection check → drops (smelted if requested) →
+     * XP → air → magnet pickup or natural drop → tool durability.
+     */
+    public static int breakExtraBlocks(Player player, ItemStack tool, List<Block> blocks,
+                                       Set<Material> blacklist, Predicate<Material> filter,
+                                       boolean smelt, boolean magnet) {
+        int broken = 0;
+        for (Block b : blocks) {
+            Material type = b.getType();
+            if (type.isAir() || blacklist.contains(type) || !filter.test(type)) continue;
+            if (!canBreakExtra(b, player)) continue;
+
+            ItemStack dropsTool = tool.clone();
+            if (smelt) dropsTool.removeEnchantment(Enchantment.SILK_TOUCH);
+            Collection<ItemStack> drops = b.getDrops(dropsTool);
+            if (smelt) drops = smelt(drops);
+            dropExperience(b, player, smelt);
+            b.setType(Material.AIR);
+            broken++;
+            for (ItemStack d : drops) {
+                if (magnet) addToInventory(player, d);
+                else player.getWorld().dropItemNaturally(b.getLocation().add(0.5, 0.5, 0.5), d);
+            }
+        }
+        if (broken > 0) damageTool(tool, broken, player);
+        return broken;
     }
 
     /** Smelts drops via SmeltUtils, honoring the blacklist and custom recipes. */
