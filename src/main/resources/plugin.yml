@@ -1,0 +1,15 @@
+name: CustomEnchants
+version: '${version}'
+main: dev.timca.customenchants.CustomEnchantsPlugin
+api-version: '1.16'
+description: Custom enchantments for Paper and Spigot servers
+authors: [TimCA]
+commands:
+  cenchant:
+    description: CustomEnchants admin command
+    usage: /cenchant <give|list|reload> [enchantment] [level]
+    permission: customenchants.admin
+permissions:
+  customenchants.admin:
+    description: Allows managing CustomEnchants
+    default: op

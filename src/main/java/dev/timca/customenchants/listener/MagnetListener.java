@@ -24,6 +24,22 @@ public class MagnetListener implements Listener {
 
     private static final int STORAGE_SLOTS = 36;
 
+    // Resolved by name: the constant was renamed ENCHANTMENT_TABLE → ENCHANT in
+    // 1.20.5, referencing either constant directly crashes the other side.
+    private static final Particle ENCHANT_PARTICLE = detectParticle();
+
+    private static Particle detectParticle() {
+        try {
+            return Particle.valueOf("ENCHANT");
+        } catch (IllegalArgumentException e) {
+            try {
+                return Particle.valueOf("ENCHANTMENT_TABLE");
+            } catch (IllegalArgumentException e2) {
+                return null;
+            }
+        }
+    }
+
     private boolean enabled;
     private boolean particles;
 
@@ -76,8 +92,8 @@ public class MagnetListener implements Listener {
             }
         }
         for (Item d : toRemove) event.getItems().remove(d);
-        if (changed && particles) {
-            player.getWorld().spawnParticle(Particle.ENCHANT, player.getLocation().add(0, 1, 0), 15, 0.5, 0.5, 0.5, 0);
+        if (changed && particles && ENCHANT_PARTICLE != null) {
+            player.getWorld().spawnParticle(ENCHANT_PARTICLE, player.getLocation().add(0, 1, 0), 15, 0.5, 0.5, 0.5, 0);
         }
     }
 

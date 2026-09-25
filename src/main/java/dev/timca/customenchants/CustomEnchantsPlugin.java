@@ -1,8 +1,12 @@
 package dev.timca.customenchants;
 
-import dev.timca.customenchants.command.GiveEnchantCommand;
+import dev.timca.customenchants.command.GiveEnchantCommandLegacy;
+import dev.timca.customenchants.command.PaperCommands;
 import dev.timca.customenchants.enchant.CustomEnchant;
 import dev.timca.customenchants.listener.*;
+import dev.timca.customenchants.util.Compat;
+import dev.timca.customenchants.util.DatapackInstaller;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -19,6 +23,7 @@ public final class CustomEnchantsPlugin extends JavaPlugin {
     private LumberjackListener lumberjackListener;
     private ExcavatorListener excavatorListener;
     private InsightListener insightListener;
+    private boolean allEnchantsRegistered;
 
     @Override
     public void onEnable() {
@@ -30,12 +35,26 @@ public final class CustomEnchantsPlugin extends JavaPlugin {
         getLogger().info("  by TimCA  ");
         getLogger().info("");
 
+        allEnchantsRegistered = true;
         for (CustomEnchant ce : CustomEnchant.values()) {
             Enchantment e = ce.getEnchantment();
             if (e == null) {
-                getLogger().severe(ce.getKey() + " NOT registered! Check bootstrapper.");
+                allEnchantsRegistered = false;
+                getLogger().warning(ce.getKey() + " is not registered yet");
             } else {
                 getLogger().info(ce.getKey() + " registered: " + e.getKey());
+            }
+        }
+        if (!allEnchantsRegistered) {
+            // Paper registers via the bootstrapper; everyone else needs the bundled
+            // datapack, and registry data only loads at server startup.
+            boolean installed = DatapackInstaller.install(this);
+            if (installed) {
+                getLogger().severe("Enchantment datapack was just installed into the world. "
+                        + "RESTART the server once — the enchantments activate after the restart.");
+            } else {
+                getLogger().severe("Enchantments are not registered. If this persists, check that "
+                        + "the world datapack 'customenchants' is enabled.");
             }
         }
 
@@ -50,7 +69,11 @@ public final class CustomEnchantsPlugin extends JavaPlugin {
         insightListener = new InsightListener();
 
         getServer().getPluginManager().registerEvents(drillListener, this);
-        getServer().getPluginManager().registerEvents(magnetListener, this);
+        // BlockDropItemEvent exists since 1.17 — on older cores this listener must
+        // never be class-loaded.
+        if (Compat.classExists("org.bukkit.event.block.BlockDropItemEvent")) {
+            getServer().getPluginManager().registerEvents(magnetListener, this);
+        }
         getServer().getPluginManager().registerEvents(farmerListener, this);
         getServer().getPluginManager().registerEvents(harpoonListener, this);
         getServer().getPluginManager().registerEvents(lootListener, this);
@@ -59,11 +82,30 @@ public final class CustomEnchantsPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(excavatorListener, this);
         getServer().getPluginManager().registerEvents(insightListener, this);
 
-        registerCommand("cenchant", new GiveEnchantCommand());
+        registerCommand("cenchant");
 
         dev.timca.customenchants.util.SmeltUtils.loadCustomRecipes(getConfig());
 
         getLogger().info("CustomEnchants v" + getDescription().getVersion() + " enabled");
+    }
+
+    private void registerCommand(String name) {
+        if (Compat.classExists("io.papermc.paper.command.brigadier.BasicCommand")) {
+            PaperCommands.register(this, name);
+            return;
+        }
+        PluginCommand cmd = getCommand(name);
+        if (cmd == null) {
+            getLogger().severe("Command '" + name + "' missing from plugin.yml");
+            return;
+        }
+        GiveEnchantCommandLegacy legacy = new GiveEnchantCommandLegacy();
+        cmd.setExecutor(legacy);
+        cmd.setTabCompleter(legacy);
+    }
+
+    public boolean isAllEnchantsRegistered() {
+        return allEnchantsRegistered;
     }
 
     @Override

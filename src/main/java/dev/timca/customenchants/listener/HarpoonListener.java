@@ -2,9 +2,7 @@ package dev.timca.customenchants.listener;
 
 import dev.timca.customenchants.CustomEnchantsPlugin;
 import dev.timca.customenchants.enchant.CustomEnchant;
-import io.papermc.paper.datacomponent.DataComponentTypes;
-import io.papermc.paper.datacomponent.item.UseCooldown;
-import net.kyori.adventure.key.Key;
+import dev.timca.customenchants.util.Compat;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -34,10 +32,8 @@ import java.util.UUID;
 
 public class HarpoonListener implements Listener {
 
-    // The Harpoon cooldown lives in its own cooldown group: the client draws the
-    // overlay only on items with this cooldown_group (see ensureHarpoonCooldownGroup),
-    // so regular tridents stay unblocked and throwable.
-    public static final Key COOLDOWN_GROUP = Key.key("customenchants", "harpoon");
+    // The overlay itself lives in HarpoonFog (Paper-only, lazily class-loaded).
+    private static final boolean FOG = Compat.harpoonFogSupported();
 
     private record Origin(Location loc, long created) {}
 
@@ -74,18 +70,11 @@ public class HarpoonListener implements Listener {
 
     /**
      * Sets the use_cooldown component with a dedicated cooldown group on the trident
-     * so the vanilla cooldown overlay only shows on Harpoon tridents.
-     * The codec requires seconds > 0, so we use a minimal positive value:
-     * ticks() == 0 and auto-applying the component on throw has no effect.
+     * so the vanilla cooldown overlay only shows on Harpoon tridents (Paper only).
      */
     public static void ensureHarpoonCooldownGroup(ItemStack item) {
-        if (item == null) return;
-        UseCooldown existing = item.getData(DataComponentTypes.USE_COOLDOWN);
-        if (existing != null && COOLDOWN_GROUP.equals(existing.cooldownGroup()) && existing.seconds() > 0f) {
-            return;
-        }
-        item.setData(DataComponentTypes.USE_COOLDOWN,
-                UseCooldown.useCooldown(0.0001f).cooldownGroup(COOLDOWN_GROUP));
+        if (!FOG) return;
+        HarpoonFog.ensure(item);
     }
 
     /**
@@ -166,7 +155,7 @@ public class HarpoonListener implements Listener {
         }
 
         cooldowns.put(pid, now);
-        player.setCooldown(COOLDOWN_GROUP, cd * 20);
+        if (FOG) HarpoonFog.apply(player, cd * 20);
 
         if (hitEntity != null && !hitEntity.equals(player)) {
             pullEntityToPlayer(player, hitEntity);

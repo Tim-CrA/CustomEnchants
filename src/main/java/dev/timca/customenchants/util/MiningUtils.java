@@ -46,6 +46,18 @@ public final class MiningUtils {
     private MiningUtils() {
     }
 
+    // Resolved by name: the constant was renamed DURABILITY → UNBREAKING in 1.20.5,
+    // referencing either constant directly crashes the other side.
+    private static final Enchantment UNBREAKING = resolveEnchantment("UNBREAKING", "DURABILITY");
+
+    private static Enchantment resolveEnchantment(String... names) {
+        for (String name : names) {
+            Enchantment e = Enchantment.getByName(name);
+            if (e != null) return e;
+        }
+        return null;
+    }
+
     /** Tools that can receive Magnet (enchantable/mining tag). */
     public static boolean isMiningTool(Material type) {
         String name = type.name();
@@ -120,7 +132,7 @@ public final class MiningUtils {
 
     /** Simulates Unbreaking: each damage point is absorbed with level/(level+1) chance. */
     public static void damageTool(ItemStack tool, int amount, Player player) {
-        int unbreaking = tool.getEnchantmentLevel(Enchantment.UNBREAKING);
+        int unbreaking = UNBREAKING == null ? 0 : tool.getEnchantmentLevel(UNBREAKING);
         int toApply = 0;
         for (int i = 0; i < amount; i++) {
             if (ThreadLocalRandom.current().nextInt(unbreaking + 1) == 0) toApply++;

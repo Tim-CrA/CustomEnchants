@@ -3,7 +3,6 @@ package dev.timca.customenchants.util;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,34 +16,44 @@ public final class SmeltUtils {
     private static boolean enabled = true;
 
     static {
-        DEFAULT_RECIPE.put(Material.RAW_IRON, Material.IRON_INGOT);
-        DEFAULT_RECIPE.put(Material.RAW_COPPER, Material.COPPER_INGOT);
-        DEFAULT_RECIPE.put(Material.RAW_GOLD, Material.GOLD_INGOT);
-        DEFAULT_RECIPE.put(Material.ANCIENT_DEBRIS, Material.NETHERITE_SCRAP);
-        DEFAULT_RECIPE.put(Material.COBBLESTONE, Material.STONE);
-        DEFAULT_RECIPE.put(Material.STONE, Material.SMOOTH_STONE);
-        DEFAULT_RECIPE.put(Material.SAND, Material.GLASS);
-        DEFAULT_RECIPE.put(Material.RED_SAND, Material.GLASS);
-        DEFAULT_RECIPE.put(Material.CLAY, Material.TERRACOTTA);
-        DEFAULT_RECIPE.put(Material.NETHERRACK, Material.NETHER_BRICK);
-        DEFAULT_RECIPE.put(Material.OAK_LOG, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.SPRUCE_LOG, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.BIRCH_LOG, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.JUNGLE_LOG, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.ACACIA_LOG, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.DARK_OAK_LOG, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.MANGROVE_LOG, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.CHERRY_LOG, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.OAK_WOOD, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.SPRUCE_WOOD, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.BIRCH_WOOD, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.JUNGLE_WOOD, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.ACACIA_WOOD, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.DARK_OAK_WOOD, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.MANGROVE_WOOD, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.CHERRY_WOOD, Material.CHARCOAL);
-        DEFAULT_RECIPE.put(Material.SMOOTH_BASALT, Material.BASALT);
-        DEFAULT_RECIPE.put(Material.BASALT, Material.SMOOTH_BASALT);
+        // Referenced by name, not by Material constants: newer materials
+        // (cherry/mangrove) don't exist on older cores and would crash the class.
+        put("RAW_IRON", "IRON_INGOT");
+        put("RAW_COPPER", "COPPER_INGOT");
+        put("RAW_GOLD", "GOLD_INGOT");
+        put("ANCIENT_DEBRIS", "NETHERITE_SCRAP");
+        put("COBBLESTONE", "STONE");
+        put("STONE", "SMOOTH_STONE");
+        put("SAND", "GLASS");
+        put("RED_SAND", "GLASS");
+        put("CLAY", "TERRACOTTA");
+        put("NETHERRACK", "NETHER_BRICK");
+        put("OAK_LOG", "CHARCOAL");
+        put("SPRUCE_LOG", "CHARCOAL");
+        put("BIRCH_LOG", "CHARCOAL");
+        put("JUNGLE_LOG", "CHARCOAL");
+        put("ACACIA_LOG", "CHARCOAL");
+        put("DARK_OAK_LOG", "CHARCOAL");
+        put("MANGROVE_LOG", "CHARCOAL");
+        put("CHERRY_LOG", "CHARCOAL");
+        put("OAK_WOOD", "CHARCOAL");
+        put("SPRUCE_WOOD", "CHARCOAL");
+        put("BIRCH_WOOD", "CHARCOAL");
+        put("JUNGLE_WOOD", "CHARCOAL");
+        put("ACACIA_WOOD", "CHARCOAL");
+        put("DARK_OAK_WOOD", "CHARCOAL");
+        put("MANGROVE_WOOD", "CHARCOAL");
+        put("CHERRY_WOOD", "CHARCOAL");
+        put("SMOOTH_BASALT", "BASALT");
+        put("BASALT", "SMOOTH_BASALT");
+    }
+
+    private static void put(String source, String result) {
+        Material s = Material.matchMaterial(source);
+        Material r = Material.matchMaterial(result);
+        if (s != null && r != null) {
+            DEFAULT_RECIPE.put(s, r);
+        }
     }
 
     private SmeltUtils() {
@@ -78,7 +87,7 @@ public final class SmeltUtils {
         }
     }
 
-    public static @Nullable Material getSmelted(Material source) {
+    public static Material getSmelted(Material source) {
         if (!enabled || BLACKLIST.contains(source)) return null;
         Material custom = CUSTOM_RECIPE.get(source);
         if (custom != null) return custom;
