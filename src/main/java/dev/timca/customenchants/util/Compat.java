@@ -8,16 +8,11 @@ import java.lang.reflect.Method;
  */
 public final class Compat {
 
-    private static final boolean PAPER_COMPONENTS;
+    private static final boolean PAPER;
     private static final boolean COOLDOWN_KEY_API;
 
     static {
-        boolean components = false;
-        try {
-            Class.forName("io.papermc.paper.datacomponent.DataComponentTypes");
-            components = true;
-        } catch (Throwable ignored) {
-        }
+        PAPER = org.bukkit.Bukkit.getPluginManager().isPluginEnabled("Paper");
         boolean cooldownKey = false;
         try {
             for (Method m : org.bukkit.entity.HumanEntity.class.getMethods()) {
@@ -30,16 +25,25 @@ public final class Compat {
             }
         } catch (Throwable ignored) {
         }
-        PAPER_COMPONENTS = components;
         COOLDOWN_KEY_API = cooldownKey;
     }
 
     private Compat() {
     }
 
+    /** Running on Paper (native enchantment registration + component API). */
+    public static boolean paper() {
+        return PAPER;
+    }
+
+    /** Brigadier command registration is available (Paper). */
+    public static boolean paperCommands() {
+        return PAPER;
+    }
+
     /** Paper data-component API is present (Paper 1.20.5+). */
     public static boolean paperComponents() {
-        return PAPER_COMPONENTS;
+        return PAPER;
     }
 
     /** Per-key player cooldown API is present (Paper). */
@@ -49,16 +53,21 @@ public final class Compat {
 
     /** The Harpoon vanilla cooldown overlay can be driven from this server. */
     public static boolean harpoonFogSupported() {
-        return PAPER_COMPONENTS && COOLDOWN_KEY_API;
+        return PAPER && COOLDOWN_KEY_API;
     }
 
-    /** True if the class is present on this server (lazy — callers must not reference it otherwise). */
-    public static boolean classExists(String name) {
+    /**
+     * BlockDropItemEvent exists since Minecraft 1.17 — older cores never see it.
+     * Parsed from Bukkit.getBukkitVersion() (e.g. "1.21.11-R0.1-SNAPSHOT").
+     */
+    public static boolean hasBlockDropItemEvent() {
+        String version = org.bukkit.Bukkit.getBukkitVersion();
+        String[] parts = version.split("[.\\-]");
         try {
-            Class.forName(name);
+            if (Integer.parseInt(parts[0]) != 1) return true; // future major — assume modern
+            return Integer.parseInt(parts[1]) >= 17;
+        } catch (Exception e) {
             return true;
-        } catch (Throwable t) {
-            return false;
         }
     }
 }

@@ -71,7 +71,7 @@ public final class CustomEnchantsPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(drillListener, this);
         // BlockDropItemEvent exists since 1.17 — on older cores this listener must
         // never be class-loaded.
-        if (Compat.classExists("org.bukkit.event.block.BlockDropItemEvent")) {
+        if (Compat.hasBlockDropItemEvent()) {
             getServer().getPluginManager().registerEvents(magnetListener, this);
         }
         getServer().getPluginManager().registerEvents(farmerListener, this);
@@ -90,7 +90,7 @@ public final class CustomEnchantsPlugin extends JavaPlugin {
     }
 
     private void registerCommand(String name) {
-        if (Compat.classExists("io.papermc.paper.command.brigadier.BasicCommand")) {
+        if (Compat.paperCommands()) {
             PaperCommands.register(this, name);
             return;
         }
