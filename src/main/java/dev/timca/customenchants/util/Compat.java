@@ -8,11 +8,9 @@ import java.lang.reflect.Method;
  */
 public final class Compat {
 
-    private static final boolean PAPER;
     private static final boolean COOLDOWN_KEY_API;
 
     static {
-        PAPER = org.bukkit.Bukkit.getPluginManager().isPluginEnabled("Paper");
         boolean cooldownKey = false;
         try {
             for (Method m : org.bukkit.entity.HumanEntity.class.getMethods()) {
@@ -31,29 +29,14 @@ public final class Compat {
     private Compat() {
     }
 
-    /** Running on Paper (native enchantment registration + component API). */
-    public static boolean paper() {
-        return PAPER;
-    }
-
-    /** Brigadier command registration is available (Paper). */
-    public static boolean paperCommands() {
-        return PAPER;
-    }
-
-    /** Paper data-component API is present (Paper 1.20.5+). */
-    public static boolean paperComponents() {
-        return PAPER;
-    }
-
-    /** Per-key player cooldown API is present (Paper). */
+    /** Per-key player cooldown API is present (Paper-family cores only). */
     public static boolean cooldownKeyApi() {
         return COOLDOWN_KEY_API;
     }
 
     /** The Harpoon vanilla cooldown overlay can be driven from this server. */
     public static boolean harpoonFogSupported() {
-        return PAPER && COOLDOWN_KEY_API;
+        return COOLDOWN_KEY_API;
     }
 
     /**

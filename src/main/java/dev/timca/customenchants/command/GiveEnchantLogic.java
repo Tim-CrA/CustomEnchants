@@ -25,6 +25,7 @@ public final class GiveEnchantLogic {
         }
         switch (args[0].toLowerCase()) {
             case "give" -> handleGive(sender, args);
+            case "apply" -> handleApply(sender, args);
             case "list" -> handleList(sender);
             case "reload" -> handleReload(sender);
             default -> sendUsage(sender);
@@ -33,13 +34,47 @@ public final class GiveEnchantLogic {
 
     public static List<String> suggest(String[] args) {
         if (args.length == 1) {
-            return List.of("give", "list", "reload");
-        } else if (args.length == 2 && "give".equalsIgnoreCase(args[0])) {
+            return List.of("give", "apply", "list", "reload");
+        } else if (args.length == 2 && ("give".equalsIgnoreCase(args[0]) || "apply".equalsIgnoreCase(args[0]))) {
             List<String> keys = new ArrayList<>();
             for (CustomEnchant e : CustomEnchant.values()) keys.add(e.getKey());
             return keys;
         }
         return List.of();
+    }
+
+    /** Applies an enchantment straight to the item in the player's main hand. */
+    private static void handleApply(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Only players can use this!");
+            return;
+        }
+        if (args.length < 2) {
+            player.sendMessage("\u00a7cUsage: /cenchant apply <key> [level]");
+            return;
+        }
+        CustomEnchant ench = CustomEnchant.byKey(args[1].toLowerCase());
+        if (ench == null) {
+            player.sendMessage("\u00a7cUnknown enchantment. Use: " + keyList());
+            return;
+        }
+        int level = 1;
+        if (args.length >= 3) {
+            try {
+                level = Integer.parseInt(args[2]);
+            } catch (NumberFormatException e) {
+                player.sendMessage("\u00a7cInvalid level.");
+                return;
+            }
+        }
+        level = Math.max(1, Math.min(level, ench.getMaxLevel()));
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir()) {
+            player.sendMessage("\u00a7cHold an item in your main hand first.");
+            return;
+        }
+        CustomEnchant.applyTo(item, ench, level);
+        player.sendMessage("\u00a7aApplied " + ench.getDisplayName() + " " + level + " to the item in your hand");
     }
 
     private static void handleGive(CommandSender sender, String[] args) {
@@ -105,6 +140,6 @@ public final class GiveEnchantLogic {
     }
 
     private static void sendUsage(CommandSender sender) {
-        sender.sendMessage("\u00a7cUsage: /cenchant <give|list|reload>");
+        sender.sendMessage("\u00a7cUsage: /cenchant <give|apply|list|reload>");
     }
 }

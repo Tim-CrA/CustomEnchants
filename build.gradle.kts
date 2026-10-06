@@ -5,17 +5,19 @@ plugins {
 }
 
 group = "dev.timca"
-version = "2.0.0"
+version = "2.1.0"
 
 repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 }
 
 val latestApi = configurations.create("latestApi")
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly("me.clip:placeholderapi:2.11.6")
     latestApi("io.papermc.paper:paper-api:26.2.build.129-stable")
 }
 

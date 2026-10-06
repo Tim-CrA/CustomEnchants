@@ -84,15 +84,24 @@ public final class CustomEnchantsPlugin extends JavaPlugin {
 
         registerCommand("cenchant");
 
+        if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            new dev.timca.customenchants.hook.CustomEnchantsExpansion(this).register();
+            getLogger().info("PlaceholderAPI hook registered");
+        }
+
         dev.timca.customenchants.util.SmeltUtils.loadCustomRecipes(getConfig());
 
         getLogger().info("CustomEnchants v" + getDescription().getVersion() + " enabled");
     }
 
     private void registerCommand(String name) {
-        if (Compat.paperCommands()) {
+        // Try the Paper path first — on Spigot it fails with NoClassDefFoundError
+        // (Brigadier classes absent) and we fall back to the classic executor.
+        try {
             PaperCommands.register(this, name);
             return;
+        } catch (Throwable notPaper) {
+            getLogger().info("Paper command API unavailable — using the classic command executor");
         }
         PluginCommand cmd = getCommand(name);
         if (cmd == null) {

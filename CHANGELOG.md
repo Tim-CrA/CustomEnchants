@@ -3,6 +3,13 @@
 Each entry below is the exact text published on the corresponding version page
 on Modrinth: https://modrinth.com/plugin/custom_enchants
 
+## What's new in 2.1.0
+
+### New
+- **`/cenchant apply <enchantment> [level]`** — apply an enchantment straight to the item in your main hand (no book needed)
+- **PlaceholderAPI support**: `%customenchants_level_<enchantment>%`, `%customenchants_has_<enchantment>%` and `%customenchants_list%` — the levels of the enchantments on the item in your hand
+- **Legacy server support (1.16.5–1.20.4)**: on cores without the custom-enchantment registry the levels are stored in each item's persistent data (shown as a lore line). Apply enchantments with `/cenchant apply`. Notes: Magnet requires 1.17+, the Harpoon cooldown fog requires Paper
+
 ## What's new in 2.0.0 — the global update
 
 ### One jar for every modern server
