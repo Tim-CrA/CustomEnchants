@@ -6,9 +6,10 @@ The plugin is actively developed. New enchantments are added with each update.
 
 ## Compatibility
 
-- Works on **Paper, Purpur, Spigot and forks** from **1.20.5** up to the latest release (26.2)
-- On Paper the enchantments register natively; on Spigot and forks they install as a world datapack on first launch — restart the server once and they are live
-- Requires Java 21+ (Minecraft 1.20.5+ already needs it)
+- Works on **Paper, Purpur, Spigot, Folia and forks** from **1.16.5** up to the latest release (26.3)
+- On Paper (1.20.5+) the enchantments register natively; on Spigot and forks they install as a world datapack on first launch — restart the server once and they are live
+- On **1.16.5–1.20.4** (legacy cores) the enchantments are stored per-item instead of the registry: apply them with `/cenchant apply` (no enchanting table), shown as a lore line. Magnet requires 1.17+, the Harpoon cooldown fog requires Paper
+- Requires Java 21+ on modern cores (Minecraft 1.20.5+ already needs it); legacy cores need Java 17+
 
 ## Features
 
@@ -51,5 +52,6 @@ The plugin is actively developed. New enchantments are added with each update.
 
 ## Requirements
 
-- Paper, Purpur, Spigot or any fork — **1.20.5+**
+- Paper, Purpur, Spigot or any fork — **1.16.5+**
+- Modern cores (1.20.5+): Java 21+ · legacy cores (1.16.5–1.20.4): Java 17+
 - Java 21+
