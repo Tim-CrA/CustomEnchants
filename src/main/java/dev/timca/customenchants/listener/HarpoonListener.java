@@ -3,10 +3,11 @@ package dev.timca.customenchants.listener;
 import dev.timca.customenchants.CustomEnchantsPlugin;
 import dev.timca.customenchants.enchant.CustomEnchant;
 import dev.timca.customenchants.util.Compat;
-import dev.timca.customenchants.util.Schedulers;
+import dev.timca.customenchants.util.FoliaDispatch;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.UseCooldown;
 import net.kyori.adventure.key.Key;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -62,8 +63,15 @@ public class HarpoonListener implements Listener {
         // the cooldown fog is uniform no matter how the trident was obtained
         // (enchanting table, anvil, loot, pickup, another plugin's command...).
         // Global tick re-dispatches per player, so it is Folia-safe.
-        Schedulers.runGlobalTimer(CustomEnchantsPlugin.getInstance(),
-                this::stampAllHeldTridents, 40L, 20L);
+        if (FOG) {
+            try {
+                FoliaDispatch.runGlobalFixedRate(CustomEnchantsPlugin.getInstance(),
+                        this::stampAllHeldTridents, 40L, 20L);
+            } catch (Throwable t) {
+                CustomEnchantsPlugin.getInstance().getServer().getScheduler()
+                        .runTaskTimer(CustomEnchantsPlugin.getInstance(), this::stampAllHeldTridents, 40L, 20L);
+            }
+        }
     }
 
     public void reload() {
@@ -86,7 +94,7 @@ public class HarpoonListener implements Listener {
     private void stampAllHeldTridents() {
         if (!enabled || !FOG) return;
         for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
-            Schedulers.runAtEntityLater(CustomEnchantsPlugin.getInstance(), p, () -> stampPlayer(p), 0);
+            FoliaDispatch.runAtEntityLater(CustomEnchantsPlugin.getInstance(), p, () -> stampPlayer(p), 0);
         }
     }
 
@@ -230,7 +238,16 @@ public class HarpoonListener implements Listener {
      * fall damage through.
      */
     private void releaseFallProtection(Player player) {
-        Schedulers.runAtEntityLater(CustomEnchantsPlugin.getInstance(), player,
+        if (Compat.cooldownKeyApi()) {
+            try {
+                FoliaDispatch.runAtEntityLater(CustomEnchantsPlugin.getInstance(), player,
+                        () -> pullingPlayers.remove(player.getUniqueId()), FALL_GRACE_TICKS);
+                return;
+            } catch (Throwable ignored) {
+                pullingPlayers.remove(player.getUniqueId());
+            }
+        }
+        Bukkit.getScheduler().runTaskLater(CustomEnchantsPlugin.getInstance(),
                 () -> pullingPlayers.remove(player.getUniqueId()), FALL_GRACE_TICKS);
     }
 
@@ -264,8 +281,16 @@ public class HarpoonListener implements Listener {
             }
         };
         if (Compat.cooldownKeyApi()) {
-            entity.getScheduler().runAtFixedRate(CustomEnchantsPlugin.getInstance(),
-                    t -> { if (!pullTask.getAsBoolean()) t.cancel(); }, null, 0L, 1L);
+            try {
+                FoliaDispatch.runAtEntityFixedRate(CustomEnchantsPlugin.getInstance(),
+                        entity, pullTask, 0L, 1L);
+            } catch (Throwable t) {
+                final org.bukkit.scheduler.BukkitTask[] holder = new org.bukkit.scheduler.BukkitTask[1];
+                holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler()
+                        .runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
+                            if (!pullTask.getAsBoolean() && holder[0] != null) holder[0].cancel();
+                        }, 0L, 1L);
+            }
         } else {
             final org.bukkit.scheduler.BukkitTask[] holder = new org.bukkit.scheduler.BukkitTask[1];
             holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler()
@@ -300,8 +325,16 @@ public class HarpoonListener implements Listener {
             }
         };
         if (Compat.cooldownKeyApi()) {
-            player.getScheduler().runAtFixedRate(CustomEnchantsPlugin.getInstance(),
-                    t -> { if (!pullTask.getAsBoolean()) t.cancel(); }, null, 0L, 1L);
+            try {
+                FoliaDispatch.runAtEntityFixedRate(CustomEnchantsPlugin.getInstance(),
+                        player, pullTask, 0L, 1L);
+            } catch (Throwable t) {
+                final org.bukkit.scheduler.BukkitTask[] holder = new org.bukkit.scheduler.BukkitTask[1];
+                holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler()
+                        .runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
+                            if (!pullTask.getAsBoolean() && holder[0] != null) holder[0].cancel();
+                        }, 0L, 1L);
+            }
         } else {
             final org.bukkit.scheduler.BukkitTask[] holder = new org.bukkit.scheduler.BukkitTask[1];
             holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler()
