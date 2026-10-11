@@ -13,3 +13,5 @@ permissions:
   customenchants.admin:
     description: Allows managing CustomEnchants
     default: op
+
+folia-supported: true

@@ -3,6 +3,10 @@ package dev.timca.customenchants.listener;
 import dev.timca.customenchants.CustomEnchantsPlugin;
 import dev.timca.customenchants.enchant.CustomEnchant;
 import dev.timca.customenchants.util.Compat;
+import dev.timca.customenchants.util.Schedulers;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.UseCooldown;
+import net.kyori.adventure.key.Key;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -21,26 +25,29 @@ import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 
 public class HarpoonListener implements Listener {
 
-    // The overlay itself lives in HarpoonFog (Paper-only, lazily class-loaded).
+    // The Harpoon cooldown lives in its own cooldown group: the client draws the
+    // overlay only on items with this cooldown_group (see ensureHarpoonCooldownGroup),
+    // so regular tridents stay unblocked and throwable. The Paper-only driver lives
+    // in HarpoonFog (lazily class-loaded; never touched on Spigot).
     private static final boolean FOG = Compat.harpoonFogSupported();
 
     private record Origin(Location loc, long created) {}
 
     private boolean enabled;
-    private final Map<UUID, Long> cooldowns = new HashMap<>();
-    private final Map<UUID, Origin> tridentOrigins = new HashMap<>();
-    private final Set<UUID> pullingPlayers = new HashSet<>();
+    // ConcurrentHashMap: touched from global + region scheduler threads on Folia
+    private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
+    private final Map<UUID, Origin> tridentOrigins = new ConcurrentHashMap<>();
+    private final Set<UUID> pullingPlayers = ConcurrentHashMap.newKeySet();
     private Map<Integer, Integer> cooldownSeconds;
     private double maxDistance = 80;
     private static final double PULL_SPEED = 0.5;
@@ -54,26 +61,16 @@ public class HarpoonListener implements Listener {
         // Safety net: stamp EVERY harpoon trident in every inventory each second, so
         // the cooldown fog is uniform no matter how the trident was obtained
         // (enchanting table, anvil, loot, pickup, another plugin's command...).
-        CustomEnchantsPlugin.getInstance().getServer().getScheduler()
-                .runTaskTimer(CustomEnchantsPlugin.getInstance(), this::stampAllHeldTridents, 40L, 20L);
-    }
-
-    private void stampAllHeldTridents() {
-        if (!enabled || !FOG) return;
-        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
-            for (ItemStack it : p.getInventory().getContents()) {
-                if (it == null || it.getType() != Material.TRIDENT) continue;
-                if (CustomEnchant.getLevel(it, CustomEnchant.HARPOON) < 1) continue;
-                HarpoonFog.ensure(it);
-            }
-        }
+        // Global tick re-dispatches per player, so it is Folia-safe.
+        Schedulers.runGlobalTimer(CustomEnchantsPlugin.getInstance(),
+                this::stampAllHeldTridents, 40L, 20L);
     }
 
     public void reload() {
         FileConfiguration config = CustomEnchantsPlugin.getInstance().getConfig();
         this.enabled = config.getBoolean("harpoon.enabled", true);
         this.maxDistance = config.getDouble("harpoon.max-distance", 80);
-        this.cooldownSeconds = new HashMap<>();
+        this.cooldownSeconds = new ConcurrentHashMap<>();
         if (config.isConfigurationSection("harpoon.cooldown-seconds")) {
             for (String key : config.getConfigurationSection("harpoon.cooldown-seconds").getKeys(false)) {
                 try {
@@ -86,9 +83,27 @@ public class HarpoonListener implements Listener {
         if (!cooldownSeconds.containsKey(3)) cooldownSeconds.put(3, 60);
     }
 
+    private void stampAllHeldTridents() {
+        if (!enabled || !FOG) return;
+        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            Schedulers.runAtEntityLater(CustomEnchantsPlugin.getInstance(), p, () -> stampPlayer(p), 0);
+        }
+    }
+
+    private void stampPlayer(Player player) {
+        if (!enabled || !FOG) return;
+        for (ItemStack it : player.getInventory().getContents()) {
+            if (it == null || it.getType() != Material.TRIDENT) continue;
+            if (CustomEnchant.getLevel(it, CustomEnchant.HARPOON) < 1) continue;
+            ensureHarpoonCooldownGroup(it);
+        }
+    }
+
     /**
      * Sets the use_cooldown component with a dedicated cooldown group on the trident
      * so the vanilla cooldown overlay only shows on Harpoon tridents (Paper only).
+     * The codec requires seconds > 0, so we use a minimal positive value:
+     * ticks() == 0 and auto-applying the component on throw has no effect.
      */
     public static void ensureHarpoonCooldownGroup(ItemStack item) {
         if (!FOG) return;
@@ -102,13 +117,13 @@ public class HarpoonListener implements Listener {
      */
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
-        if (!enabled) return;
+        if (!enabled || !FOG) return;
         Action action = event.getAction();
         if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
         ItemStack hand = event.getPlayer().getInventory().getItemInMainHand();
         if (hand.getType() != Material.TRIDENT) return;
         if (CustomEnchant.getLevel(hand, CustomEnchant.HARPOON) < 1) return;
-        ensureHarpoonCooldownGroup(hand);
+        HarpoonFog.ensure(hand);
     }
 
     @EventHandler
@@ -214,38 +229,50 @@ public class HarpoonListener implements Listener {
      * ticks AFTER the pull task finishes, so removing the flag immediately let the
      * fall damage through.
      */
-    private void releaseFallProtection(UUID uuid) {
-        CustomEnchantsPlugin.getInstance().getServer().getScheduler()
-                .runTaskLater(CustomEnchantsPlugin.getInstance(),
-                        () -> pullingPlayers.remove(uuid), FALL_GRACE_TICKS);
+    private void releaseFallProtection(Player player) {
+        Schedulers.runAtEntityLater(CustomEnchantsPlugin.getInstance(), player,
+                () -> pullingPlayers.remove(player.getUniqueId()), FALL_GRACE_TICKS);
     }
 
     private void pullEntityToPlayer(Player player, Entity entity) {
         // Only the PULLED player gets fall-damage protection — adding the shooter
         // here would grant them a few seconds of fall-damage immunity per throw.
-        final UUID[] pulledPlayerId = {null};
+        final Player[] pulledPlayer = {null};
         if (entity instanceof Player pulled) {
-            pulledPlayerId[0] = pulled.getUniqueId();
-            pullingPlayers.add(pulledPlayerId[0]);
+            pulledPlayer[0] = pulled;
+            pullingPlayers.add(pulled.getUniqueId());
         }
         Location origin = player.getLocation();
-        BukkitTask[] holder = new BukkitTask[1];
-        long[] ticks = {0};
-        holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler().runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
-            if (!entity.isValid() || entity.getLocation().distance(origin) < 1.5 || ++ticks[0] > MAX_PULL_TICKS) {
-                if (pulledPlayerId[0] != null) releaseFallProtection(pulledPlayerId[0]);
-                if (holder[0] != null) holder[0].cancel();
-                return;
+        // The task returns false to stop itself
+        BooleanSupplier pullTask = new BooleanSupplier() {
+            private long ticks = 0;
+
+            @Override
+            public boolean getAsBoolean() {
+                if (!entity.isValid() || entity.getLocation().distance(origin) < 1.5 || ++ticks > MAX_PULL_TICKS) {
+                    if (pulledPlayer[0] != null) releaseFallProtection(pulledPlayer[0]);
+                    return false;
+                }
+                Vector dir = origin.toVector().subtract(entity.getLocation().toVector());
+                double dist = dir.length();
+                if (dist < 1.5) {
+                    if (pulledPlayer[0] != null) releaseFallProtection(pulledPlayer[0]);
+                    return false;
+                }
+                entity.setVelocity(dir.normalize().multiply(Math.min(dist * PULL_SPEED, 2.0)));
+                return true;
             }
-            Vector dir = origin.toVector().subtract(entity.getLocation().toVector());
-            double dist = dir.length();
-            if (dist < 1.5) {
-                if (pulledPlayerId[0] != null) releaseFallProtection(pulledPlayerId[0]);
-                if (holder[0] != null) holder[0].cancel();
-                return;
-            }
-            entity.setVelocity(dir.normalize().multiply(Math.min(dist * PULL_SPEED, 2.0)));
-        }, 0L, 1L);
+        };
+        if (Compat.cooldownKeyApi()) {
+            entity.getScheduler().runAtFixedRate(CustomEnchantsPlugin.getInstance(),
+                    t -> { if (!pullTask.getAsBoolean()) t.cancel(); }, null, 0L, 1L);
+        } else {
+            final org.bukkit.scheduler.BukkitTask[] holder = new org.bukkit.scheduler.BukkitTask[1];
+            holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler()
+                    .runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
+                        if (!pullTask.getAsBoolean() && holder[0] != null) holder[0].cancel();
+                    }, 0L, 1L);
+        }
         player.getWorld().playSound(player.getLocation(), Sound.ITEM_TRIDENT_HIT, 1, 1);
     }
 
@@ -253,22 +280,34 @@ public class HarpoonListener implements Listener {
         UUID puid = player.getUniqueId();
         pullingPlayers.add(puid);
         player.getWorld().playSound(target, Sound.ITEM_TRIDENT_RIPTIDE_3, 1, 1);
-        BukkitTask[] holder = new BukkitTask[1];
-        long[] ticks = {0};
-        holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler().runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
-            if (!player.isOnline() || player.getLocation().distance(target) < 1.5 || ++ticks[0] > MAX_PULL_TICKS) {
-                releaseFallProtection(puid);
-                if (holder[0] != null) holder[0].cancel();
-                return;
+        BooleanSupplier pullTask = new BooleanSupplier() {
+            private long ticks = 0;
+
+            @Override
+            public boolean getAsBoolean() {
+                if (!player.isOnline() || player.getLocation().distance(target) < 1.5 || ++ticks > MAX_PULL_TICKS) {
+                    releaseFallProtection(player);
+                    return false;
+                }
+                Vector dir = target.toVector().subtract(player.getLocation().toVector());
+                double dist = dir.length();
+                if (dist < 1.5) {
+                    releaseFallProtection(player);
+                    return false;
+                }
+                player.setVelocity(dir.normalize().multiply(Math.min(dist * PULL_SPEED, 2.0)));
+                return true;
             }
-            Vector dir = target.toVector().subtract(player.getLocation().toVector());
-            double dist = dir.length();
-            if (dist < 1.5) {
-                releaseFallProtection(puid);
-                if (holder[0] != null) holder[0].cancel();
-                return;
-            }
-            player.setVelocity(dir.normalize().multiply(Math.min(dist * PULL_SPEED, 2.0)));
-        }, 0L, 1L);
+        };
+        if (Compat.cooldownKeyApi()) {
+            player.getScheduler().runAtFixedRate(CustomEnchantsPlugin.getInstance(),
+                    t -> { if (!pullTask.getAsBoolean()) t.cancel(); }, null, 0L, 1L);
+        } else {
+            final org.bukkit.scheduler.BukkitTask[] holder = new org.bukkit.scheduler.BukkitTask[1];
+            holder[0] = CustomEnchantsPlugin.getInstance().getServer().getScheduler()
+                    .runTaskTimer(CustomEnchantsPlugin.getInstance(), () -> {
+                        if (!pullTask.getAsBoolean() && holder[0] != null) holder[0].cancel();
+                    }, 0L, 1L);
+        }
     }
 }

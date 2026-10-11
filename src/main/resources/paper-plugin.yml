@@ -4,3 +4,4 @@ main: dev.timca.customenchants.CustomEnchantsPlugin
 api-version: '1.21'
 description: Custom enchantments for Paper
 bootstrapper: dev.timca.customenchants.CustomEnchantsBootstrapper
+folia-supported: true
