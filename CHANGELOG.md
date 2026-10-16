@@ -3,6 +3,14 @@
 Each entry below is the exact text published on the corresponding version page
 on Modrinth: https://modrinth.com/plugin/custom_enchants
 
+## What's new in 2.1.1
+
+### Compatibility
+- **Folia support** — regionized multithreading is fully handled: entity schedulers, concurrent state, `folia-supported` flag; verified live on Folia 1.21.11
+- **26.3 support** — verified live on stable Paper 26.3
+- **Bukkit/CraftBukkit verified** — a live test on Spigot 1.21.1 confirmed the world-datapack installation and enchantment registration path; CraftBukkit ships inside Spigot
+- Hardened command and scheduler detection: every core now automatically takes the right path (native Paper registration, world datapack, or per-item legacy storage)
+
 ## What's new in 2.1.0
 
 ### New
