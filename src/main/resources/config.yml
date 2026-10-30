@@ -74,8 +74,10 @@ veinminer:
     - ANCIENT_DEBRIS
     # Other
     - COAL_BLOCK
-    - DEEPSLATE
-    - CALCITE
+    # WARNING: only list materials that form small veins in nature.
+    # Mass-fill blocks like DEEPSLATE or CALCITE make VeinMiner eat up to
+    # max-vein-size blocks per break (a ~4x4x4 cube), carving through the
+    # rock and leaving ore veins behind untouched.
 
 lumberjack:
   enabled: true
