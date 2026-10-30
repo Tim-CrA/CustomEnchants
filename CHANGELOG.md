@@ -3,13 +3,19 @@
 Each entry below is the exact text published on the corresponding version page
 on Modrinth: https://modrinth.com/plugin/custom_enchants
 
+## What's new in 2.1.2
+
+### Fixed
+- **Critical:** the plugin no longer fails to enable on servers with PlaceholderAPI installed. The expansion class is now loaded through a declared dependency (Paper `join-classpath`, Spigot `softdepend`), and even if that ever fails the plugin stays enabled — only the placeholder hook is skipped
+- Declared the PlaceholderAPI dependency in both plugin descriptors so every supported core joins the classpath correctly
+
 ## What's new in 2.1.1
 
 ### Compatibility
-- **Folia support** — regionized multithreading is fully handled: entity schedulers, concurrent state, `folia-supported` flag; verified live on Folia 1.21.11
-- **26.3 support** — verified live on stable Paper 26.3
-- **Bukkit/CraftBukkit verified** — a live test on Spigot 1.21.1 confirmed the world-datapack installation and enchantment registration path; CraftBukkit ships inside Spigot
-- Hardened command and scheduler detection: every core now automatically takes the right path (native Paper registration, world datapack, or per-item legacy storage)
+- **Folia support** — full support for Folia's regionized multithreading: entity schedulers, thread-safe state, and the `folia-supported` flag. Tested against Folia 1.21.11
+- **Minecraft 26.3 support** — tested against stable Paper 26.3
+- **Spigot and CraftBukkit support** — tested on Spigot 1.21.1: the world-datapack installation and enchantment registration work exactly as documented (CraftBukkit ships inside Spigot)
+- Smarter platform detection — commands, schedulers, and enchantment storage automatically select the correct path for each server core (native Paper registration, world datapack, or per-item legacy storage)
 
 ## What's new in 2.1.0
 

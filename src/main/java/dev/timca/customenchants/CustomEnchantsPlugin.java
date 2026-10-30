@@ -84,9 +84,15 @@ public final class CustomEnchantsPlugin extends JavaPlugin {
 
         registerCommand("cenchant");
 
+        // Optional integration — must never disable the whole plugin if the
+        // expansion class cannot be loaded for any reason.
         if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            new dev.timca.customenchants.hook.CustomEnchantsExpansion(this).register();
-            getLogger().info("PlaceholderAPI hook registered");
+            try {
+                new dev.timca.customenchants.hook.CustomEnchantsExpansion(this).register();
+                getLogger().info("PlaceholderAPI hook registered");
+            } catch (Throwable t) {
+                getLogger().warning("PlaceholderAPI found but the hook failed to load: " + t);
+            }
         }
 
         dev.timca.customenchants.util.SmeltUtils.loadCustomRecipes(getConfig());
